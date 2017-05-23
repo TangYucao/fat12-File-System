@@ -6,7 +6,7 @@
 #include <time.h>
 #include <sstream>
 #include <iostream>
-
+#include <bitset>
 //#define OLDVERSION
 using namespace std;
 typedef unsigned char u8;   //1字节
@@ -63,7 +63,7 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName);
 dwHandle：传入标识该文件的句柄，就是MyCreateFile返回的那个
  *
  */
-void MyCloseFile(DWORD dwHandle);
+void MyCloseFile(DWORD dwHandle);//??
 /** \brief
  *
  要求：删除指定目录下的指定文件，如果目录不存在或者文件不存在，则返回0表示失败，否则返回TRUE表示成功；

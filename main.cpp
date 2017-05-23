@@ -13,6 +13,8 @@ using namespace std;
 FILE* fat12 = fopen("floppy.img", "rb");//这句将会被替换
 #endif // OLDVERSION
 void printFilesNew(struct RootEntry* rootEntry_ptr);//从util中实现的函数
+void printAllRootEntryStruct();
+u16 findNextFat(u16 FstClus);
 struct BPB bpb;
 struct BPB* bpb_ptr = &bpb;
 struct RootEntry rootEntry;
@@ -46,9 +48,29 @@ int main()
 	else {
 		cout << "[debug]:Read BPB fail!" << endl;
 	}
+	printAllRootEntryStruct();
+//#define CREATE
+#ifdef CREATE
+	MyCreateFile("", "t1.txt");
+#endif // CREATE
+#ifndef CREATE
+	MyDeleteFile("", "t1.txt");
+#endif // !CRENATE
+
+	MyCreateDirectory("", "dir1");
 	
-	MyCreateFile("", "t32.txt");
-	printFilesNew( rootEntry_ptr);
+	//findNextFat(5 );
+
+
+
+
+	printFilesNew(rootEntry_ptr);
+	DWORD dwHandle=MyOpenFile("", "t2.txt");
+	cout << "[output]open file state: "<< dwHandle << endl;
+	//MyWriteFile(dwHandle,"Hello World tyc!",17);
+	char *buffer= (char*)malloc(20);
+	//MyReadFile(dwHandle, buffer, 0);
+	ShutdownDisk();
 #ifdef OLDVERSION
 	//载入fat12文件给BPB.fat12必须是11~25字节存放了BPB中的数据，比如：存放了每扇区字节数=13
 	fillBPB(fat12, bpb_ptr);
@@ -320,3 +342,4 @@ void printFiles(FILE * fat12, struct RootEntry* rootEntry_ptr)
 		}
 	}
 }
+
