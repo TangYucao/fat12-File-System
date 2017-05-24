@@ -13,7 +13,7 @@ using namespace std;
 FILE* fat12 = fopen("floppy.img", "rb");//这句将会被替换
 #endif // OLDVERSION
 void printFilesNew(struct RootEntry* rootEntry_ptr);//从util中实现的函数
-void printAllRootEntryStruct();
+void printAllRootEntryStruct(int FstClusHJQ = 0x0);
 u16 findNextFat(u16 FstClus);
 struct BPB bpb;
 struct BPB* bpb_ptr = &bpb;
@@ -51,22 +51,21 @@ int main()
 	printAllRootEntryStruct();
 //#define CREATE
 #ifdef CREATE
-	MyCreateFile("", "t1.txt");
+	MyCreateFile("C:\\dir", "t1.txt");
 #endif // CREATE
 #ifndef CREATE
-	MyDeleteFile("", "t1.txt");
+	MyDeleteFile("C:\\dir", "t1.txt");
 #endif // !CRENATE
 
-	MyCreateDirectory("", "dir1");
-	
+	MyCreateDirectory("", "dir");
+	//MyCreateDirectory("C:\\dir1", "dirdir1");
 	//findNextFat(5 );
-
-
-
+	//MyCreateFile("", "file1");
+	
 
 	printFilesNew(rootEntry_ptr);
-	DWORD dwHandle=MyOpenFile("", "t2.txt");
-	cout << "[output]open file state: "<< dwHandle << endl;
+	DWORD dwHandle=MyOpenFile("c://", "file2");
+	cout << "[output]open file state: "<< dec<<dwHandle << endl;
 	//MyWriteFile(dwHandle,"Hello World tyc!",17);
 	char *buffer= (char*)malloc(20);
 	//MyReadFile(dwHandle, buffer, 0);

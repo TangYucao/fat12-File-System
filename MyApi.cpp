@@ -6,6 +6,7 @@
 
 extern FILE* fat12;//Õâ¾ä½«»á±»Ìæ»»
 #endif // OLDVERSION
+using namespace std;
 //RootEntry* dwHandles[MAX_NUM] = { NULL };//ÎÄ¼ş¾ä±ú£¿
 extern struct BPB* bpb_ptr;
 extern struct RootEntry* rootEntry_ptr;
@@ -16,94 +17,218 @@ int  RsvdSecCnt;    //Boot¼ÇÂ¼Õ¼ÓÃµÄÉÈÇøÊı
 int  NumFATs;   //FAT±í¸öÊı
 int  RootEntCnt;    //¸ùÄ¿Â¼×î´óÎÄ¼şÊı
 int  FATSz; //FATÉÈÇøÊı
-BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)
+BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ«ÊÇfolderĞèÒªÎŞ
 {
-	u16 FstClus = findEmptyFat();
+	u16 FstClus = findEmptyFat();//ÓÃÀ´ÌîĞ´DIR_FstClus
+	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
+	int base;
 	cout << "[debug]findEmptyFat():" << FstClus << endl;
-	DWORD FileHandle = 0;
 	cout << "[output]trying to create Directory named " << pszFolderName;
 	if (strcmp(pszFolderPath, "") != 0)
-		cout << " in folder " << pszFolderPath << endl;
-	else cout << endl;
-	//œÊ‚äŒ¤ÕÒ
-	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
-	cout << "[output]constant base:" << base << endl;
-	int check;
-	//ÒÀ´Î´¦Àí¸ùÄ¿Â¼ÖĞµÄ¸÷¸öÌõÄ¿
-	for (int i = 0; i < RootEntCnt; i++)
 	{
+		cout << " in folder " << pszFolderPath << endl;
+		if ((FstClusHJQ = isPathExist(pszFolderPath)) || strlen(pszFolderPath) == 3)//´æÔÚ²ÅÄÜ¼ÌĞø,ÒÔºóÌí¼ÓµÄÎÄ¼şÓ¦
+		{
+			if (isDirectoryExist(pszFolderName, FstClusHJQ))
+			{
+				cout << "[output]" << pszFolderPath << '\\' << pszFolderName << " folder has existed!" << endl;
+				return false;//»ñµÃpszFolderNameµÄ´ØºÅ£¡
+			}
+			if (FstClusHJQ == 0) {
+				// ¸ùÄ¿Â¼ÇøÆ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+			}
+			else {
+				// Êı¾İÇøÎÄ¼şÊ×Ö·Æ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//=
+				cout << "[debug]" << pszFolderPath << "'s FstClus value is:"<< FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
+			}
+		}
+		else {
+			cout << "[output]" << pszFolderPath << '\\' << pszFolderName << " path does not exist!" << endl;
 
+			return false;
+		}
+	}//---------------------------------------------ÉÏÃæÊÇÊäÈëÁËÂ·¾¶µÄÇé¿ö¡£
+	else {
+		cout << endl;
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬´´½¨ÔÚ¸ùÄ¿Â¼ÏÂ¡£
+	cout << "[output]"<< pszFolderName<<"'s RootEntry is ready to write in position:" << hex<<base<<" (16 hexadecimal)" << endl;
+	
+	for (int i = 0; i < RootEntCnt; i++)//Ñ°ÕÒ¿ÕµÄÄ¿Â¼£¡
+	{
 		SetHeaderOffset(base, NULL, FILE_BEGIN);
 		ReadFromDisk(rootEntry_ptr, 32, NULL);
 		base += 32;
 		if (strcmp(pszFolderName, rootEntry_ptr->DIR_Name) == 0)//ÒÑ¾­´æÔÚ£¨ÖØÃû£©
 			return false;
+
 		if (rootEntry_ptr->DIR_Name[0] == '\0') //continue;     //·Ç¿ÕÌõÄ¿£¬²»¿ÉÒÔĞ´ÈëÎÄ¼ş
 												//¿ÕÌõÄ¿£¬¿ÉÒÔĞ´ÈëÎÄ¼ş
 		{
 			RootEntry *DirInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
-			cout << "[output]into loop2" << endl;
 			strcpy(DirInfo_ptr->DIR_Name, pszFolderName);
 			DirInfo_ptr->DIR_Attr = 0x10;
 			fillTime(DirInfo_ptr->DIR_WrtDate, DirInfo_ptr->DIR_WrtTime);
 			DirInfo_ptr->DIR_FileSize = 0;
 			DirInfo_ptr->DIR_FstClus = FstClus;
-			cout << "[output]constant input dir name:" << DirInfo_ptr->DIR_Name << endl;
-			printf("[output]constant input file attr:%x\n", DirInfo_ptr->DIR_Attr);
-			cout << "[output]constant input file firstClus:" << DirInfo_ptr->DIR_FstClus << endl;
-			SetHeaderOffset(base - 32, NULL, FILE_BEGIN);
-			if (WriteToDisk(DirInfo_ptr, 32, NULL))
+			if (strcmp(pszFolderPath, "") != 0)//Èç¹ûÓĞ¸ùÂ·¾¶
 			{
+				SetHeaderOffset(base-32, NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
 				dwHandles.push_back(*DirInfo_ptr);
-				FileHandle = dwHandles.size();
+				//TODO:×¼±¸Ìí¼Ó'.' Óë '..'£¬¡°.¡±ÊÇµ±Ç°Ä¿Â¼µÄ±ğÃû£¬¡°..¡±Ê×´Ø¾Í¸ÄÖ¸ÏòÉÏ¼¶Ä¿Â¼ÎÄ¼şµÄÊ×´Ø¡£
+				//Ìí¼Óµ½Ëü·ÖÅäµÄ´Ø¡£
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (DirInfo_ptr->DIR_FstClus - 2) * BytsPerSec;//ÖØĞÂ¼ÆËãbase£¬ÔÚ×Ô¼ºµÄÊı¾İÉÈÇøĞ´"."£¡
+				int selfFstClus = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
+				cout << "[debug]¸ÃÎÄ¼ş¼ĞµÄµØÖ·£¨ÓĞ¸ù£©Â·¾¶ :" << hex << base << endl;
+				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
+				clearCu(DirInfo_ptr->DIR_FstClus);
+				SetHeaderOffset(base, NULL, FILE_BEGIN);
+				initFileInfo(DirInfo_ptr,".", 0x10, 0, DirInfo_ptr->DIR_FstClus);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				initFileInfo(DirInfo_ptr, "..", 0x10, 0, FstClusHJQ);//ÌîÉÏÒ»¸ö¸úÄ¿Â¼µÄÊ×´Ø
+				SetHeaderOffset(base+32, NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
 				writeFat(FstClus, 0xffff);
 				return true;
 			}
-
-			else cout << "[debug]Write to disk fail!" << endl;
+			if (strcmp(pszFolderPath, "") == 0)//Èç¹ûÎŞ¸ùÂ·¾¶£¬ÔÚ¸ùÎÄ¼şÄ¿Â¼Ğ´£»²¢ÇÒÓ¦¸ÃÔÚÊı¾İÉÈÇøÏàÓ¦µÄÎ»ÖÃÌí¼Ó.ºÍ..²Å¶Ô¡£
+			{
+				
+				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				dwHandles.push_back(*DirInfo_ptr);
+				FstClusHJQ = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32;//10176
+				base+=(FstClusHJQ - 2) * BytsPerSec;//Ğ´ÔÚ¶ÔÓ¦µÄÉÈÇø£¡
+				cout << "[debug]¸ÃÎÄ¼ş¼ĞµÄµØÖ·£¨ÎŞ¸ù£© :" << hex<<base << endl;
+				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
+				clearCu(DirInfo_ptr->DIR_FstClus);
+				SetHeaderOffset(base , NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				initFileInfo(DirInfo_ptr, ".", 0x10, 0, DirInfo_ptr->DIR_FstClus);//´Ø¾ÍÊÇ×Ô¼º£¡
+				SetHeaderOffset(base, NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				initFileInfo(DirInfo_ptr, "..", 0x10, 0, 0x00);//ÉÏÒ»¸ö´Ø¾ÍÊÇ¸ùÄ¿Â¼£¬0´Ø
+				SetHeaderOffset(base+32, NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				writeFat(FstClus, 0xffff);
+				return true;
+			}
 		}
 
 	}
 	return false;
 }
 DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
-{	
-	u16 FstClus = findEmptyFat();
+{
+	fillHandles();
+	int FileHandle = 0;
+	u16 FstClus = findEmptyFat();//ÓÃÀ´ÌîĞ´DIR_FstClus
+	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
+	int base;
 	cout << "[debug]findEmptyFat():" << FstClus << endl;
-	
-	DWORD FileHandle = 0;
-	//printBPB();
-	cout << "[output]trying to create file named " << pszFileName;
+	cout << "[output]trying to create Directory named " << pszFileName;
 	if (strcmp(pszFolderPath, "") != 0)
+	{
 		cout << " in folder " << pszFolderPath << endl;
-	else cout << endl;
-	//œÊ‚äŒ¤ÕÒ
-	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
-	cout << "[output]constant base:" << base << endl;
-	int check;
-	//ÒÀ´Î´¦Àí¸ùÄ¿Â¼ÖĞµÄ¸÷¸öÌõÄ¿
-	int i;
+		if ((FstClusHJQ = isPathExist(pszFolderPath)) || strlen(pszFolderPath) == 3)//´æÔÚ²ÅÄÜ¼ÌĞø,ÒÔºóÌí¼ÓµÄÎÄ¼şÓ¦
+		{
+			if (isFileExist(pszFileName, FstClusHJQ))
+			{
+				cout << "[output]" << pszFolderPath << '\\' << pszFileName << " file has existed!" << endl;
+				return false;//»ñµÃpszFolderNameµÄ´ØºÅ£¡
+			}
+			if (FstClusHJQ == 0) {
+				// ¸ùÄ¿Â¼ÇøÆ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+			}
+			else {
+				// Êı¾İÇøÎÄ¼şÊ×Ö·Æ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//=
+				cout << "[debug]" << pszFolderPath << "'s FstClus value is:" << FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
+			}
+		}
+		else {
+			cout << "[output]" << pszFolderPath << '\\' << pszFileName << " path does not exist!" << endl;
 
-	int max_FstClus = 0;//ÓÃÓÚÑ°ÕÒ×î´óµÄÊ×´ØFstClus,ĞÂÎÄ¼şÌí¼ÓÔÚÆäÖ®ºó¡£
-	int max_FinalClus = 0;//ÖÕÖ¹´Ø=FstClus+m
-	for (i = 0; i < RootEntCnt; i++)
+			return false;
+		}
+	}//---------------------------------------------ÉÏÃæÊÇÊäÈëÁËÂ·¾¶µÄÇé¿ö¡£
+	else {
+		cout << endl;
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬´´½¨ÔÚ¸ùÄ¿Â¼ÏÂ¡£
+	cout << "[output]" << pszFileName << "'s RootEntry is ready to write in position:" << hex << base << " (16 hexadecimal)" << endl;
+	for (int i = 0; i < RootEntCnt; i++)//Ñ°ÕÒ¿ÕµÄÄ¿Â¼£¡
+	{
+		SetHeaderOffset(base, NULL, FILE_BEGIN);
+		ReadFromDisk(rootEntry_ptr, 32, NULL);
+		base += 32;
+		if (strcmp(pszFileName, rootEntry_ptr->DIR_Name) == 0)//ÒÑ¾­´æÔÚ£¨ÖØÃû£©
+			return false;
+		if (rootEntry_ptr->DIR_Name[0] == '\0') //continue;     //·Ç¿ÕÌõÄ¿£¬²»¿ÉÒÔĞ´ÈëÎÄ¼ş
+												//¿ÕÌõÄ¿£¬¿ÉÒÔĞ´ÈëÎÄ¼ş
+		{
+			RootEntry *DirInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
+			strcpy(DirInfo_ptr->DIR_Name, pszFileName);
+			DirInfo_ptr->DIR_Attr = 0x20;
+			fillTime(DirInfo_ptr->DIR_WrtDate, DirInfo_ptr->DIR_WrtTime);
+			DirInfo_ptr->DIR_FileSize = 0;
+			DirInfo_ptr->DIR_FstClus = FstClus;
+			if (strcmp(pszFolderPath, "") != 0)//Èç¹ûÓĞ¸ùÂ·¾¶
+			{
+				dwHandles.push_back(*DirInfo_ptr);
+				FileHandle = dwHandles.size();
+				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				dwHandles.push_back(*DirInfo_ptr);
+				//TODO:×¼±¸Ìí¼Ó'.' Óë '..'£¬¡°.¡±ÊÇµ±Ç°Ä¿Â¼µÄ±ğÃû£¬¡°..¡±Ê×´Ø¾Í¸ÄÖ¸ÏòÉÏ¼¶Ä¿Â¼ÎÄ¼şµÄÊ×´Ø¡£
+				//Ìí¼Óµ½Ëü·ÖÅäµÄ´Ø¡£
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (DirInfo_ptr->DIR_FstClus - 2) * BytsPerSec;//ÖØĞÂ¼ÆËãbase,µÃµ½Õâ¸öÎÄ¼ş´ØËùÔÚµÄÎïÀíµØÖ·
+				int selfFstClus = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
+				cout << "[debug]¸ÃÎÄ¼şµÄµØÖ·£¨ÓĞ¸ù£©Â·¾¶ :" << hex << base << endl;
+				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
+				clearCu(DirInfo_ptr->DIR_FstClus);
+				writeFat(FstClus, 0xffff);
+				return FileHandle;
+			}
+			else if (strcmp(pszFolderPath, "") == 0)//Èç¹ûÎŞ¸ùÂ·¾¶£¬ÔÚ¸ùÎÄ¼şÄ¿Â¼Ğ´£»²¢ÇÒÓ¦¸ÃÔÚÊı¾İÉÈÇøÏàÓ¦µÄÎ»ÖÃÌí¼Ó.ºÍ..²Å¶Ô¡£
+			{
+				dwHandles.push_back(*DirInfo_ptr);
+				FileHandle = dwHandles.size();
+				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼
+				WriteToDisk(DirInfo_ptr, 32, NULL);
+				dwHandles.push_back(*DirInfo_ptr);
+				FstClusHJQ = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32;//10176
+				base += (FstClusHJQ - 2) * BytsPerSec;//Ğ´ÔÚ¶ÔÓ¦µÄÉÈÇø£¡
+				cout << "[debug]¸ÃÎÄ¼şµÄµØÖ·£¨ÎŞ¸ù£© :" << hex << base << endl;
+				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
+				clearCu(DirInfo_ptr->DIR_FstClus);
+				writeFat(FstClus, 0xffff);
+				return FileHandle;
+			}
+		}
+	}
+	return FileHandle;
+
+
+
+	/*
+	for (int i = 0; i < RootEntCnt; i++)
 	{
 
 		SetHeaderOffset(base, NULL, FILE_BEGIN);
 		ReadFromDisk(rootEntry_ptr, 32, NULL);
-		if (max_FstClus < rootEntry_ptr->DIR_FstClus&&rootEntry_ptr->DIR_Name[0] != '\0')
-		{
-			max_FstClus = rootEntry_ptr->DIR_FstClus;
-			u32 cuSize = SecPerClus*BytsPerSec; //512
-			u16 needCu = (rootEntry_ptr->DIR_FileSize + cuSize - 1) / cuSize;
-			max_FinalClus = max_FstClus + needCu;
-		}
 		base += 32;
 		//²»ĞèÒª¹ıÂË£¡
 
 		if (strcmp(pszFileName, rootEntry_ptr->DIR_Name) == 0)//ÒÑ¾­´æÔÚ£¨ÖØÃû£©
 			return 0;
-		if (rootEntry_ptr->DIR_Name[0] == '\0') //continue;     //·Ç¿ÕÌõÄ¿£¬²»¿ÉÒÔĞ´ÈëÎÄ¼ş
+		if (rootEntry_ptr->DIR_Name[0] == '\0'|| rootEntry_ptr->DIR_Name[0] == '\0') //continue;     //·Ç¿ÕÌõÄ¿£¬²»¿ÉÒÔĞ´ÈëÎÄ¼ş
 			//¿ÕÌõÄ¿£¬¿ÉÒÔĞ´ÈëÎÄ¼ş
 
 		{
@@ -117,15 +242,7 @@ DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 			u16 needCu = (FileInfo_ptr->DIR_FileSize + cuSize - 1) / cuSize;//ÏòÉÏÈ¡Õû£¬»ñµÃĞèÒªµÄ´ØµÄ¸öÊı
 //TODO£º¿ªÊ¼´ØĞèÒª¸ÄĞ´¡£
 			FileInfo_ptr->DIR_FstClus = FstClus;
-			cout << "[output]constant cuSize :" << cuSize << endl;
-			cout << "[output]constant needCu :" << needCu << endl;
-			cout << "[output]constant input file name:" << FileInfo_ptr->DIR_Name << endl;
-			cout << "[output]constant input FileSize:" << FileInfo_ptr->DIR_FileSize << endl;
-			printf("[output]constant input file attr:%x\n", FileInfo_ptr->DIR_Attr);
-			cout << "[output]constant input file date:" << FileInfo_ptr->DIR_WrtDate << endl;
-			cout << "[output]constant input file time:" << FileInfo_ptr->DIR_WrtTime << endl;
-			cout << "[output]constant input file firstClus:" << FileInfo_ptr->DIR_FstClus << endl;
-			// TODO (812015941#1#): Ğ´Èë´ÅÅÌÖĞ
+// TODO (812015941#1#): Ğ´Èë´ÅÅÌÖĞ
 			SetHeaderOffset(base - 32, NULL, FILE_BEGIN);
 			if (WriteToDisk(FileInfo_ptr, 32, NULL))
 			{
@@ -140,6 +257,7 @@ DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 
 	}
 	return FileHandle;
+	*/
 }
 
 /** \brief
@@ -152,10 +270,16 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 {
 	fillHandles();
 	DWORD FileHandle = 0;
+	bool trick = true;//trick:ÎªÕæ²ÅÄÜ·µ»Ø¡£
+	int HandleBack=0;
 	//printBPB();
 	cout << "[output]trying to delete file named " << pszFileName;
 	if (strcmp(pszFolderPath, "") != 0)
+	{
+		//trick:Èç¹ûÃ»ÓĞÄ¿Â¼£¬µÚÒ»´Î³öÏÖ¾ÍÈ¡³ö¡£Èç¹ûÃ»ÓĞÄ¿Â¼£¬ÄÇÃ´µÚ¶ş´ÎÈ¡³ö
+		trick = !trick;
 		cout << " in folder " << pszFolderPath << endl;
+	}
 	else cout << endl;
 	//œÊ‚äŒ¤ÕÒ
 	int i = 0;
@@ -165,9 +289,17 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 		if (strcmp(pszFileName, dwHandles[i].DIR_Name) == 0)
 		{
 			FileHandle = i;
-			return FileHandle;
+			if (trick) {
+				return FileHandle;//ÎªÕæ£¬Á¢¿Ì·µ»Ø£¡
+			}
+			else
+			{
+				trick = !trick;
+				HandleBack = FileHandle;
+			}
 		}
 		i++;
+
 	}
 	/*for (int i = 1; i < dwHandles.size(); i++)
 	{
@@ -178,13 +310,76 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 		}
 		else iter++;
 	}*/
-	return FileHandle;
+	return HandleBack;
 }
 
-void MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈİ£¿?
+BOOL MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈİ£¿?
 {
-	DWORD FileHandle = 0;
-	//printBPB();
+	int FileHandle = 0;
+	u16 FstClus = findEmptyFat();//ÓÃÀ´ÌîĞ´DIR_FstClus
+	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
+	int base;
+	cout << "[debug]findEmptyFat():" << FstClus << endl;
+	cout << "[output]trying to delete file named " << pszFileName;
+	if (strcmp(pszFolderPath, "") != 0)
+	{
+		cout << " in folder " << pszFolderPath << endl;
+		if ((FstClusHJQ = isPathExist(pszFolderPath)) || strlen(pszFolderPath) == 3)//´æÔÚ²ÅÄÜ¼ÌĞø,ÒÔºóÌí¼ÓµÄÎÄ¼şÓ¦
+		{
+			if (isFileExist(pszFileName, FstClusHJQ))
+			{
+				cout << "[output]" << pszFolderPath << '\\' << pszFileName << " file existed! Continuing..." << endl;
+			}
+			if (FstClusHJQ == 0) {
+				// ¸ùÄ¿Â¼ÇøÆ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+			}
+			else {
+				// Êı¾İÇøÎÄ¼şÊ×Ö·Æ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//=
+				cout << "[debug]" << pszFolderPath << "'s FstClus value is:" << FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
+			}
+		}
+		else {
+			cout << "[output]" << pszFolderPath << '\\' << pszFileName << " path does not exist!" << endl;
+			return false;
+		}
+	}//---------------------------------------------ÉÏÃæÊÇÊäÈëÁËÂ·¾¶µÄÇé¿ö¡£
+	else {
+		cout << endl;
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬´´½¨ÔÚ¸ùÄ¿Â¼ÏÂ¡£
+
+	cout << "[output]" << pszFileName << "'s RootEntry is ready to be cleared in position:" << hex << base << " (16 hexadecimal)" << endl;
+	for (int i = 0; i < RootEntCnt; i++)//ÕÒµ½ÒªÉ¾³ıµÄÎÄ¼ş£¡
+	{
+		SetHeaderOffset(base, NULL, FILE_BEGIN);
+		ReadFromDisk(rootEntry_ptr, 32, NULL);
+		base += 32;
+		if (strcmp(pszFileName, rootEntry_ptr->DIR_Name) == 0)//ÕÒµ½À²
+		{
+			RootEntry *DirInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
+			SetHeaderOffset(base - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼
+			initFileInfo(DirInfo_ptr, "", 0x0, 0, 0);
+			WriteToDisk(DirInfo_ptr, 32, NULL);
+			FstClusHJQ = rootEntry_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø
+			int nextClus = 0;
+			do {
+				if (nextClus != 0)//ÉñÀ´Ö®±Ê£¡ÓÃÀ´°¤¸öÉ¾³ı¶«Î÷£¡
+				{
+					FstClusHJQ = nextClus;
+				}
+				clearCu(FstClusHJQ);
+				nextClus = findNextFat(FstClusHJQ);
+				writeFat(FstClusHJQ, 0x0000);
+			} while (nextClus != 0xFFF && nextClus != 0);
+			return true;
+		}
+	}
+	return false;
+
+
+	/*
 	cout << "[output]trying to delete file named " << pszFileName;
 	if (strcmp(pszFolderPath, "") != 0)
 		cout << " in folder " << pszFolderPath << endl;
@@ -225,7 +420,7 @@ void MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈ
 					writeFat(FstClus, 0x0000);
 					FstClus = tmpClus;
 				}
-				if(FstClus==0xfff)//²»ÄÜÌæ»»0x200HµÄ±£Áô´Ø
+				if (FstClus == 0xfff)//²»ÄÜÌæ»»0x200HµÄ±£Áô´Ø
 					writeFat(FstClus, 0x0000);
 				break;
 			}
@@ -235,6 +430,7 @@ void MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈ
 
 	}
 	return;
+	*/
 }
 //TODO: Ğ´ÎÄ¼ş
 /** \brief

@@ -20,10 +20,7 @@ extern struct RootEntry* rootEntry_ptr;
 打印一个Fat12的文件基本信息
 */
 void printRootEntryStruct(RootEntry* rootEntry_ptr);
-/** \brief
-打印所有Fat12的文件基本信息
-*/
-void printAllRootEntryStruct();
+
 /** \brief
 打印整个文件系统的基本信息
 */
@@ -49,10 +46,7 @@ int getHandleLength(T &x);
 已弃用，创建句柄
 */
 DWORD createHandle(RootEntry* FileInfo);
-/** \brief
-把文件句柄填满
-*/
-void fillHandles();
+
 /** \brief
 文件是否存在？还没写
 */
@@ -68,29 +62,11 @@ void printRootEntryStruct(RootEntry* rootEntry_ptr)
 	cout << setw(22) << "[debug]DIR_WrtDate:" << setw(14) << rootEntry_ptr->DIR_WrtDate << endl;
 	cout << setw(22) << "[debug]DIR_FstClus:" << setw(14) << rootEntry_ptr->DIR_FstClus << endl;
 	cout << setw(22) << "[debug]DIR_FileSize:" << setw(14) << rootEntry_ptr->DIR_FileSize << endl;
+	cout << setw(22) << "[debug]its FstClus postion (16位):" << setw(14) <<hex
+		<< (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (rootEntry_ptr->DIR_FstClus - 2) * BytsPerSec<< endl;
 	cout << setw(22) << "------------end-------------------" << endl;
 }
-void printAllRootEntryStruct()
-{
-	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
-	RootEntry *FileInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
-	for (int i = 0; i < RootEntCnt; i++)
-	{
 
-
-		SetHeaderOffset(base, NULL, FILE_BEGIN);
-		ReadFromDisk(FileInfo_ptr, 32, NULL);
-		if (FileInfo_ptr->DIR_Name[0] == '\0')
-		{
-			base += 32;
-			continue;
-
-		}
-		printRootEntryStruct(FileInfo_ptr);
-		base += 32;
-
-	}
-}
 void printBPB()
 {
 	cout << setw(22) << "[debug]BytsPerSec:" << setw(14) << BytsPerSec << endl;
@@ -114,29 +90,39 @@ void fillTime(u16 &DIR_WrtDate, u16 &DIR_WrtTime)
 	tmp = stream.str();
 	DIR_WrtTime = atoi(tmp.c_str());
 }
-void fillHandles()
+/** \brief
+把文件句柄填满
+*/
+void fillHandles(int FstClusHJQ = 0x0)
 {
-	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+	int base;
+	if (FstClusHJQ == 0x0)
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//=9728=0x2600
+	else
+		base = BytsPerSec * (RsvdSecCnt + FATSz * NumFATs + (RootEntCnt * 32 + BytsPerSec - 1) / BytsPerSec) + (FstClusHJQ - 2) * SecPerClus * BytsPerSec;
+
+
 	RootEntry *FileInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
 	for (int i = 0; i < RootEntCnt; i++)
 	{
-
-
 		SetHeaderOffset(base, NULL, FILE_BEGIN);
 		ReadFromDisk(FileInfo_ptr, 32, NULL);
-		if (FileInfo_ptr->DIR_Name[0] == '\0')
+		if (FileInfo_ptr->DIR_Name[0] == '\0' || FileInfo_ptr->DIR_Name[0] == '.')
 		{
 			base += 32;
 			continue;
 
 		}
-		else {
+		if ((FileInfo_ptr->DIR_Attr == 0x10 || FileInfo_ptr->DIR_Attr == 0x20 || FileInfo_ptr->DIR_Attr == 0x28) && strlen(FileInfo_ptr->DIR_Name) <= 20)
+		{
 			//printRootEntryStruct(FileInfo_ptr);
-			base += 32;
-			int i;
 			dwHandles.push_back(*FileInfo_ptr);
 		}
-
+		if (FileInfo_ptr->DIR_Attr == 0x10)
+		{
+			fillHandles(FileInfo_ptr->DIR_FstClus);
+		}
+		base += 32;
 	}
 }
 /** \brief
@@ -254,11 +240,29 @@ void writeFat(u16 FstClus, u16 bytes)
 	SetHeaderOffset(offset_fat - 1, NULL, FILE_BEGIN);
 	WriteToDisk(bytes_ptr,2,NULL);
 }
+/** \brief
+清空选定的簇的内容！
+FstClus:指定要消除的簇的值。
+*/
+void clearCu(u16 FstClus)
+{
 
+	int base;
+	base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
+	char byte[512] = { 0x0};
+	memset(byte, 0x0, sizeof(byte));
+
+	int count= BytsPerSec*SecPerClus/512;//需要清理的次数
+	for (int i=0;i<count;i++)
+	{
+		SetHeaderOffset(base, NULL, FILE_BEGIN);
+		WriteToDisk(byte, 512, NULL);
+	}
+
+}
 void printFilesNew(struct RootEntry* rootEntry_ptr)
 {
 	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec; //根目录首字节的偏移数
-	int check;
 	char realName[12];  //暂存将空格替换成点后的文件名
 
 						//依次处理根目录中的各个条目
@@ -338,11 +342,44 @@ void printFilesNew(struct RootEntry* rootEntry_ptr)
 		}
 	}
 }
+/** \brief
+打印所有Fat12的文件基本信息
+*/
+void printAllRootEntryStruct(int FstClusHJQ = 0x0)
+{
 
+	int base;
+	if (FstClusHJQ ==0x0)
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//=9728=0x2600
+	else
+		base = BytsPerSec * (RsvdSecCnt + FATSz * NumFATs + (RootEntCnt * 32 + BytsPerSec - 1) / BytsPerSec)+(FstClusHJQ - 2) * SecPerClus * BytsPerSec;
+
+	RootEntry *FileInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
+	for (int i = 0; i < RootEntCnt; i++)
+	{
+
+		SetHeaderOffset(base, NULL, FILE_BEGIN);
+		ReadFromDisk(FileInfo_ptr, 32, NULL);
+		if (FileInfo_ptr->DIR_Name[0] == '\0'||FileInfo_ptr->DIR_Name[0] == '.')
+		{
+			base += 32;
+			continue;
+
+		}
+		if ((FileInfo_ptr->DIR_Attr == 0x10|| FileInfo_ptr->DIR_Attr == 0x20||FileInfo_ptr->DIR_Attr == 0x28)&& strlen(FileInfo_ptr->DIR_Name)<=20)
+			printRootEntryStruct(FileInfo_ptr);
+		if (FileInfo_ptr->DIR_Attr == 0x10)
+		{
+			printAllRootEntryStruct(FileInfo_ptr->DIR_FstClus);
+		}
+		base += 32;
+	}
+	return;
+}
 void printChildrenNew(char * directory, int startClus)
 {
 	//数据区的第一个簇（即2号簇）的偏移字节
-	int dataBase = BytsPerSec * (RsvdSecCnt + FATSz * NumFATs + (RootEntCnt * 32 + BytsPerSec - 1) / BytsPerSec);
+	int dataBase = BytsPerSec * ( RsvdSecCnt + FATSz * NumFATs + (RootEntCnt * 32 + BytsPerSec - 1) / BytsPerSec);
 	char fullName[24];  //存放文件路径及全名
 	int strLength = strlen(directory);
 	strcpy(fullName, directory);
@@ -493,11 +530,147 @@ int getHandleLength(T &x)
 	int result = s1 / s2;
 	return result;
 }
-BOOL isFileExist(char *pszFileName, u16 FstClus)
+BOOL isFileExist(char *pszFileName, u16 FstClus) {
+	char filename[13];
+	int dataBase;
+	BOOL isExist = FALSE;
+	// 遍历当前目录所有项目
+	do {
+		int loop;
+		if (FstClus == 0) {
+			// 根目录区偏移
+			dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+			loop = RootEntCnt;
+		}
+		else {
+			// 数据区文件首址偏移
+			dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2) * BytsPerSec;
+			loop = BytsPerSec / 32;
+		}
+		for (int i = 0; i < loop; i++) {
+			SetHeaderOffset(dataBase, NULL, FILE_BEGIN);
+			if (ReadFromDisk(rootEntry_ptr, 32, NULL) != 0) {
+				// 目录0x10，文件0x20，卷标0x28
+				int len_of_filename = 0;
+				if (rootEntry_ptr->DIR_Attr == 0x20) {
+					for (int j = 0; j < 11; j++) {
+						if (rootEntry_ptr->DIR_Name[j] != ' ') {
+							filename[len_of_filename++] = rootEntry_ptr->DIR_Name[j];
+						}
+						else {
+							filename[len_of_filename++] = '.';
+							while (rootEntry_ptr->DIR_Name[j] == ' ') j++;
+							j--;
+						}
+					}
+					filename[len_of_filename] = '\0';
+					// 忽略大小写比较
+					if (_stricmp(filename, pszFileName) == 0) {
+						isExist = TRUE;
+						break;
+					}
+				}
+			}
+			dataBase += 32;
+		}
+		if (isExist) break;
+	} while ((FstClus = findNextFat(FstClus)) != 0xFFF && FstClus != 0);
+	return isExist;
+}
+/** \brief
+判断目录是否存在
+*/
+u16 isDirectoryExist(char *FolderName, u16 FstClus) {
+	char directory[12];
+	int dataBase;
+	u16 isExist = 0;
+	// 遍历当前目录所有项目
+	do {
+		if (FstClus == 0) {
+			// 根目录区偏移
+			dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+		}
+		else {
+			// 数据区文件首址偏移
+			dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2) * BytsPerSec;
+		}
+		for (int i = 0; i < RootEntCnt; i++) {
+			SetHeaderOffset(dataBase, NULL, FILE_BEGIN);
+			if (ReadFromDisk(rootEntry_ptr, 32, NULL) != 0) {
+				// 目录0x10，文件0x20，卷标0x28
+				if (rootEntry_ptr->DIR_Attr == 0x10) {
+					for (int j = 0; j < 11; j++) {
+						if (rootEntry_ptr->DIR_Name[j] != ' ') {
+							directory[j] = rootEntry_ptr->DIR_Name[j];
+							if (j == 10) {
+								directory[11] = '\0';
+								break;
+							}
+						}
+						else {
+							directory[j] = '\0';
+							break;
+						}
+					}
+					// 忽略大小写比较
+					if (_stricmp(directory, FolderName) == 0) {
+						isExist = rootEntry_ptr->DIR_FstClus;
+						break;
+					}
+				}
+			}
+			dataBase += 32;
+		}
+		if (isExist) break;
+	} while ((FstClus = findNextFat(FstClus)) != 0xFFF && FstClus != 0);
+	return isExist;
+}
+/** \brief
+判断路劲是否存在
+*/
+u16 isPathExist(char *pszFolderPath) {
+	char directory[12]; // 存放目录名
+	u16 FstClus = 0;
+	/* 从3开始，跳过盘符C:\\ */
+	int i = 3, len = 0;
+	while (pszFolderPath[i] != '\0') {
+		if (pszFolderPath[i] == '\\') {
+			directory[len] = '\0';
+			//cout << directory << endl;
+			if (FstClus = isDirectoryExist(directory, FstClus)) {
+				len = 0;
+			}
+			else {
+				len = 0;
+				break;
+			}
+			i++;
+		}
+		else {
+			directory[len++] = pszFolderPath[i++];
+		}
+	}
+	if (len > 0) {
+		directory[len] = '\0';
+		//cout << directory << endl;
+		FstClus = isDirectoryExist(directory, FstClus);
+	}
+	return FstClus;
+}
+char* getPathName(char *pszFolderPath)
 {
-
-
-	return true;
+	int i = 3;
+	int len = 0;
+	char directory[12]; // 存放目录名
+	while (pszFolderPath[i] != '\0') {//直到末尾
+		if (pszFolderPath[i] != '\\')
+		{
+			directory[len++] = pszFolderPath[i++];
+		}
+		else break;//此时得到了directory
+	}
+	directory[len] = '\0';
+	return directory;
 }
 DWORD createHandle(RootEntry* FileInfo) {
 	int i;
@@ -525,22 +698,6 @@ string DecIntToHexStr(int num)
 /** \brief
 16进制字符串char*转换为10进制string
 */
-string ToHexString(u8* buf, int len, std::string tok = "")
-{
-	std::string output;
-	char temp[8];
-	for (int i = 0; i < len; ++i)
-	{
-		sprintf(temp, "0x%.2x", (u8)buf[i]);
-		output.append(temp, 4);
-		output.append(tok);
-	}
-
-	return output;
-}
-/** \brief
-更新Fat表项
-*/
 void updateRootEntry(RootEntry *FileInfo_ptr)
 {
 	int dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//写回fat
@@ -557,5 +714,43 @@ void updateRootEntry(RootEntry *FileInfo_ptr)
 		}
 	}
 
+}
+void initFileInfo(RootEntry* FileInfo_ptr, char* FileName, u8 FileAttr, u32 FileSize, u16 FstClus) {
+	FileInfo_ptr->DIR_Attr = FileAttr;
+	memset(FileInfo_ptr->DIR_Name, 0, sizeof(FileInfo_ptr->DIR_Name));
+	fillTime(FileInfo_ptr->DIR_WrtDate, FileInfo_ptr->DIR_WrtTime);
+	if (FileAttr == 0x10) {
+		FileInfo_ptr->DIR_FileSize = BytsPerSec;
+		strcpy(FileInfo_ptr->DIR_Name, FileName);
+	}
+	else {
+		FileInfo_ptr->DIR_FileSize = FileSize;
+		int i = 0;
+		while (FileName[i] != '\0') {
+			if (FileName[i] == '.') {
+				int j = i;
+				while (j < 8) {
+					FileInfo_ptr->DIR_Name[j] = 0x20;
+					j++;
+				}
+				i++;
+				break;
+			}
+			else {
+				FileInfo_ptr->DIR_Name[i] = FileName[i];
+				i++;
+			}
+
+		}
+		memcpy(&FileInfo_ptr->DIR_Name[8], &FileName[i], 3);
+	}
+	int clusNum;
+	if ((FileSize % BytsPerSec) == 0 && FileSize != 0) {
+		clusNum = FileSize / BytsPerSec;
+	}
+	else {
+		clusNum = FileSize / BytsPerSec + 1;
+	}
+	FileInfo_ptr->DIR_FstClus = FstClus;
 }
 #endif // UTIL_H_INCLUDED
