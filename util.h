@@ -13,9 +13,8 @@ using namespace std;
 /** \brief
 文件句柄容器
 */
-vector<RootEntry> dwHandles;
+vector<FileHandle> dwHandles;
 extern struct RootEntry* rootEntry_ptr;
-//extern RootEntry* dwHandles[MAX_NUM];
 /** \brief
 打印一个Fat12的文件基本信息
 */
@@ -42,10 +41,6 @@ template<typename T>
 已弃用，获取C数组长度
 */
 int getHandleLength(T &x);
-/** \brief
-已弃用，创建句柄
-*/
-DWORD createHandle(RootEntry* FileInfo);
 
 /** \brief
 文件是否存在？还没写
@@ -61,7 +56,7 @@ void printRootEntryStruct(RootEntry* rootEntry_ptr)
 	cout << setw(22) << "[debug]DIR_WrtTime:" << setw(14) << rootEntry_ptr->DIR_WrtTime << endl;
 	cout << setw(22) << "[debug]DIR_WrtDate:" << setw(14) << rootEntry_ptr->DIR_WrtDate << endl;
 	cout << setw(22) << "[debug]DIR_FstClus:" << setw(14) << rootEntry_ptr->DIR_FstClus << endl;
-	cout << setw(22) << "[debug]DIR_FileSize:" << setw(14) << rootEntry_ptr->DIR_FileSize << endl;
+	cout << setw(22) << "[debug]DIR_FileSize:" << setw(14) <<dec<< rootEntry_ptr->DIR_FileSize << endl;
 	cout << setw(22) << "[debug]its FstClus postion (16位):" << setw(14) <<hex
 		<< (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (rootEntry_ptr->DIR_FstClus - 2) * BytsPerSec<< endl;
 	cout << setw(22) << "------------end-------------------" << endl;
@@ -96,10 +91,16 @@ void fillTime(u16 &DIR_WrtDate, u16 &DIR_WrtTime)
 void fillHandles(int FstClusHJQ = 0x0)
 {
 	int base;
-	if (FstClusHJQ == 0x0)
+	int parentClus;
+	if (FstClusHJQ == 0x0) {
+		parentClus = 0;
 		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//=9728=0x2600
-	else
+	}
+	else {
+		parentClus = FstClusHJQ;
 		base = BytsPerSec * (RsvdSecCnt + FATSz * NumFATs + (RootEntCnt * 32 + BytsPerSec - 1) / BytsPerSec) + (FstClusHJQ - 2) * SecPerClus * BytsPerSec;
+	}
+
 
 
 	RootEntry *FileInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
@@ -116,11 +117,16 @@ void fillHandles(int FstClusHJQ = 0x0)
 		if ((FileInfo_ptr->DIR_Attr == 0x10 || FileInfo_ptr->DIR_Attr == 0x20 || FileInfo_ptr->DIR_Attr == 0x28) && strlen(FileInfo_ptr->DIR_Name) <= 20)
 		{
 			//printRootEntryStruct(FileInfo_ptr);
-			dwHandles.push_back(*FileInfo_ptr);
+			FileHandle fileHandle;
+			fileHandle.fileInfo =*FileInfo_ptr;
+			fileHandle.parentClus = parentClus;
+			dwHandles.push_back(fileHandle);
 		}
 		if (FileInfo_ptr->DIR_Attr == 0x10)
 		{
+			int tmpFstClusHJQ = FileInfo_ptr->DIR_FstClus;
 			fillHandles(FileInfo_ptr->DIR_FstClus);
+			FstClusHJQ = tmpFstClusHJQ;
 		}
 		base += 32;
 	}
@@ -223,7 +229,7 @@ void writeFat(u16 FstClus, u16 bytes)
 	u16 * bytes_ptr = &bytes;
 	ReadFromDisk(bytes_ptrOri, 2, NULL);
 //	cout << "[debug]writeFat() origin cluster is 0x" << hex << bytes_ptrOri << "H" << endl;
-	if (_oven == true) {
+	if (_oven == true) {//要写的簇是偶数
 		bytesOri = bytesOri >> 12;//只留下前四位
 		bytesOri = bytesOri << 12;
 		bytes = bytes << 4;
@@ -233,8 +239,15 @@ void writeFat(u16 FstClus, u16 bytes)
 	else {
 		bytesOri = bytesOri << 12;//只留下后四位
 		bytesOri = bytesOri >> 12;
-		bytes = bytes >> 4;
-		bytes = bytes << 4;
+		if (bytes == 0xffff || bytes == 0x0000)
+		{
+			bytes = bytes >> 4;
+			bytes = bytes << 4;
+		}
+		else
+		{
+			bytes = bytes << 4;
+		}
 	}
 	bytes = bytes | bytesOri;
 	SetHeaderOffset(offset_fat - 1, NULL, FILE_BEGIN);
@@ -631,11 +644,15 @@ u16 isDirectoryExist(char *FolderName, u16 FstClus) {
 u16 isPathExist(char *pszFolderPath) {
 	char directory[12]; // 存放目录名
 	u16 FstClus = 0;
+	bool firstSlope = true;
 	/* 从3开始，跳过盘符C:\\ */
 	int i = 3, len = 0;
 	while (pszFolderPath[i] != '\0') {
 		if (pszFolderPath[i] == '\\') {
+			if (firstSlope == false)
+				break;
 			directory[len] = '\0';
+			firstSlope = false;
 			//cout << directory << endl;
 			if (FstClus = isDirectoryExist(directory, FstClus)) {
 				len = 0;
@@ -672,12 +689,6 @@ char* getPathName(char *pszFolderPath)
 	directory[len] = '\0';
 	return directory;
 }
-DWORD createHandle(RootEntry* FileInfo) {
-	int i;
-	dwHandles.push_back(*FileInfo);
-	i = dwHandles.size();
-	return i;
-}
 /** \brief
 10进制数字转换为16进制string
 */
@@ -698,9 +709,13 @@ string DecIntToHexStr(int num)
 /** \brief
 16进制字符串char*转换为10进制string
 */
-void updateRootEntry(RootEntry *FileInfo_ptr)
+void updateRootEntry(u16 parentClus,RootEntry *FileInfo_ptr)
 {
-	int dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//写回fat
+	int dataBase;
+	if(parentClus==0)//在2600处更新
+		dataBase=(RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//写回RootEntry
+	else //在目录下，比如4600处更新
+		dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (parentClus - 2) * BytsPerSec;//
 	for (int i = 0; i < RootEntCnt; i++)
 	{
 		SetHeaderOffset(dataBase, NULL, FILE_BEGIN);

@@ -48,27 +48,53 @@ int main()
 	else {
 		cout << "[debug]:Read BPB fail!" << endl;
 	}
-	printAllRootEntryStruct();
-//#define CREATE
-#ifdef CREATE
-	MyCreateFile("C:\\dir", "t1.txt");
-#endif // CREATE
-#ifndef CREATE
-	MyDeleteFile("C:\\dir", "t1.txt");
-#endif // !CRENATE
-
-	MyCreateDirectory("", "dir");
-	//MyCreateDirectory("C:\\dir1", "dirdir1");
-	//findNextFat(5 );
-	//MyCreateFile("", "file1");
 	
+////#define CREATE
+//#ifdef CREATE
+//	MyCreateFile("C:\\dir", "t1.txt");
+//#endif // CREATE
+//#ifndef CREATE
+//	MyDeleteFile("C:\\dir", "t1.txt");
+//#endif // !CRENATE
 
-	printFilesNew(rootEntry_ptr);
-	DWORD dwHandle=MyOpenFile("c://", "file2");
+
+	//*创建目录
+	MyCreateDirectory("", "dir");
+	//*/
+	/*创建文件1
+	MyCreateFile("", "tyc1.txt");
+	//*/
+	//*创建文件1
+	MyCreateFile("c:\\dir", "tyc2.txt");
+	//*/
+	/*删除目录
+	MyDeleteDirectory("", "dir");
+	//*/
+	/*删除文件
+	MyDeleteFile("c:\\dir", "tyc2.txt");
+	//*/
+
+	//*打开文件
+	DWORD dwHandle=MyOpenFile("c:\\dir", "tyc2.txt");
 	cout << "[output]open file state: "<< dec<<dwHandle << endl;
-	//MyWriteFile(dwHandle,"Hello World tyc!",17);
-	char *buffer= (char*)malloc(20);
-	//MyReadFile(dwHandle, buffer, 0);
+	//*/
+	//*设置文件位置
+	MySetFilePointer(dwHandle, 100, MY_FILE_BEGIN);
+	//*/
+	/*读取文件
+	char *buffer = (char*)malloc(1024);
+	MyReadFile(dwHandle, buffer, 1024);
+	//*/
+	//*写文件
+	//char *buffer = (char*)malloc(1024);
+	char pBuffer[512] = { 'c' };
+	for (int i = 0; i < 512; i++) {
+		pBuffer[i] = 'F';
+	}
+	MyWriteFile(dwHandle,&pBuffer,sizeof(pBuffer));
+	//*/
+
+	printAllRootEntryStruct();
 	ShutdownDisk();
 #ifdef OLDVERSION
 	//载入fat12文件给BPB.fat12必须是11~25字节存放了BPB中的数据，比如：存放了每扇区字节数=13

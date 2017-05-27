@@ -7,7 +7,6 @@
 extern FILE* fat12;//Õâ¾ä½«»á±»Ìæ»»
 #endif // OLDVERSION
 using namespace std;
-//RootEntry* dwHandles[MAX_NUM] = { NULL };//ÎÄ¼ş¾ä±ú£¿
 extern struct BPB* bpb_ptr;
 extern struct RootEntry* rootEntry_ptr;
 //ÏÂÃæ¶¼Îª¹Ì¶¨Öµ¡£
@@ -41,7 +40,7 @@ BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ
 			else {
 				// Êı¾İÇøÎÄ¼şÊ×Ö·Æ«ÒÆ
 				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//=
-				cout << "[debug]" << pszFolderPath << "'s FstClus value is:"<< FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
+				cout << "[debug]" << pszFolderPath << "'s FstClus value is:" << FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
 			}
 		}
 		else {
@@ -54,8 +53,8 @@ BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ
 		cout << endl;
 		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
 	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬´´½¨ÔÚ¸ùÄ¿Â¼ÏÂ¡£
-	cout << "[output]"<< pszFolderName<<"'s RootEntry is ready to write in position:" << hex<<base<<" (16 hexadecimal)" << endl;
-	
+	cout << "[output]" << pszFolderName << "'s RootEntry is ready to write in position:" << hex << base << " (16 hexadecimal)" << endl;
+
 	for (int i = 0; i < RootEntCnt; i++)//Ñ°ÕÒ¿ÕµÄÄ¿Â¼£¡
 	{
 		SetHeaderOffset(base, NULL, FILE_BEGIN);
@@ -75,9 +74,8 @@ BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ
 			DirInfo_ptr->DIR_FstClus = FstClus;
 			if (strcmp(pszFolderPath, "") != 0)//Èç¹ûÓĞ¸ùÂ·¾¶
 			{
-				SetHeaderOffset(base-32, NULL, FILE_BEGIN);
+				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
-				dwHandles.push_back(*DirInfo_ptr);
 				//TODO:×¼±¸Ìí¼Ó'.' Óë '..'£¬¡°.¡±ÊÇµ±Ç°Ä¿Â¼µÄ±ğÃû£¬¡°..¡±Ê×´Ø¾Í¸ÄÖ¸ÏòÉÏ¼¶Ä¿Â¼ÎÄ¼şµÄÊ×´Ø¡£
 				//Ìí¼Óµ½Ëü·ÖÅäµÄ´Ø¡£
 				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (DirInfo_ptr->DIR_FstClus - 2) * BytsPerSec;//ÖØĞÂ¼ÆËãbase£¬ÔÚ×Ô¼ºµÄÊı¾İÉÈÇøĞ´"."£¡
@@ -86,33 +84,32 @@ BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ
 				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
 				clearCu(DirInfo_ptr->DIR_FstClus);
 				SetHeaderOffset(base, NULL, FILE_BEGIN);
-				initFileInfo(DirInfo_ptr,".", 0x10, 0, DirInfo_ptr->DIR_FstClus);
+				initFileInfo(DirInfo_ptr, ".", 0x10, 0, DirInfo_ptr->DIR_FstClus);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
 				initFileInfo(DirInfo_ptr, "..", 0x10, 0, FstClusHJQ);//ÌîÉÏÒ»¸ö¸úÄ¿Â¼µÄÊ×´Ø
-				SetHeaderOffset(base+32, NULL, FILE_BEGIN);
+				SetHeaderOffset(base + 32, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
 				writeFat(FstClus, 0xffff);
 				return true;
 			}
 			if (strcmp(pszFolderPath, "") == 0)//Èç¹ûÎŞ¸ùÂ·¾¶£¬ÔÚ¸ùÎÄ¼şÄ¿Â¼Ğ´£»²¢ÇÒÓ¦¸ÃÔÚÊı¾İÉÈÇøÏàÓ¦µÄÎ»ÖÃÌí¼Ó.ºÍ..²Å¶Ô¡£
 			{
-				
+
 				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼
 				WriteToDisk(DirInfo_ptr, 32, NULL);
-				dwHandles.push_back(*DirInfo_ptr);
 				FstClusHJQ = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
 				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32;//10176
-				base+=(FstClusHJQ - 2) * BytsPerSec;//Ğ´ÔÚ¶ÔÓ¦µÄÉÈÇø£¡
-				cout << "[debug]¸ÃÎÄ¼ş¼ĞµÄµØÖ·£¨ÎŞ¸ù£© :" << hex<<base << endl;
+				base += (FstClusHJQ - 2) * BytsPerSec;//Ğ´ÔÚ¶ÔÓ¦µÄÉÈÇø£¡
+				cout << "[debug]¸ÃÎÄ¼ş¼ĞµÄµØÖ·£¨ÎŞ¸ù£© :" << hex << base << endl;
 				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
 				clearCu(DirInfo_ptr->DIR_FstClus);
-				SetHeaderOffset(base , NULL, FILE_BEGIN);
+				SetHeaderOffset(base, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
 				initFileInfo(DirInfo_ptr, ".", 0x10, 0, DirInfo_ptr->DIR_FstClus);//´Ø¾ÍÊÇ×Ô¼º£¡
 				SetHeaderOffset(base, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
 				initFileInfo(DirInfo_ptr, "..", 0x10, 0, 0x00);//ÉÏÒ»¸ö´Ø¾ÍÊÇ¸ùÄ¿Â¼£¬0´Ø
-				SetHeaderOffset(base+32, NULL, FILE_BEGIN);
+				SetHeaderOffset(base + 32, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
 				writeFat(FstClus, 0xffff);
 				return true;
@@ -125,7 +122,7 @@ BOOL MyCreateDirectory(char *pszFolderPath, char *pszFolderName)//pathĞèÒªÓĞ£¬ µ
 DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 {
 	fillHandles();
-	int FileHandle = 0;
+	int dwHandle = 0;
 	u16 FstClus = findEmptyFat();//ÓÃÀ´ÌîĞ´DIR_FstClus
 	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
 	int base;
@@ -180,11 +177,12 @@ DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 			DirInfo_ptr->DIR_FstClus = FstClus;
 			if (strcmp(pszFolderPath, "") != 0)//Èç¹ûÓĞ¸ùÂ·¾¶
 			{
-				dwHandles.push_back(*DirInfo_ptr);
-				FileHandle = dwHandles.size();
+				FileHandle fileHandle;
+				fileHandle.fileInfo = *DirInfo_ptr;
+				dwHandles.push_back(fileHandle);
+				dwHandle = dwHandles.size();
 				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);
 				WriteToDisk(DirInfo_ptr, 32, NULL);
-				dwHandles.push_back(*DirInfo_ptr);
 				//TODO:×¼±¸Ìí¼Ó'.' Óë '..'£¬¡°.¡±ÊÇµ±Ç°Ä¿Â¼µÄ±ğÃû£¬¡°..¡±Ê×´Ø¾Í¸ÄÖ¸ÏòÉÏ¼¶Ä¿Â¼ÎÄ¼şµÄÊ×´Ø¡£
 				//Ìí¼Óµ½Ëü·ÖÅäµÄ´Ø¡£
 				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (DirInfo_ptr->DIR_FstClus - 2) * BytsPerSec;//ÖØĞÂ¼ÆËãbase,µÃµ½Õâ¸öÎÄ¼ş´ØËùÔÚµÄÎïÀíµØÖ·
@@ -193,15 +191,16 @@ DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
 				clearCu(DirInfo_ptr->DIR_FstClus);
 				writeFat(FstClus, 0xffff);
-				return FileHandle;
+				return dwHandle;
 			}
 			else if (strcmp(pszFolderPath, "") == 0)//Èç¹ûÎŞ¸ùÂ·¾¶£¬ÔÚ¸ùÎÄ¼şÄ¿Â¼Ğ´£»²¢ÇÒÓ¦¸ÃÔÚÊı¾İÉÈÇøÏàÓ¦µÄÎ»ÖÃÌí¼Ó.ºÍ..²Å¶Ô¡£
 			{
-				dwHandles.push_back(*DirInfo_ptr);
-				FileHandle = dwHandles.size();
+				FileHandle fileHandle;
+				fileHandle.fileInfo = *DirInfo_ptr;
+				dwHandles.push_back(fileHandle);
+				dwHandle = dwHandles.size();
 				SetHeaderOffset(base - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼
 				WriteToDisk(DirInfo_ptr, 32, NULL);
-				dwHandles.push_back(*DirInfo_ptr);
 				FstClusHJQ = DirInfo_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø£¬ÓÃÀ´Ìî"."
 				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32;//10176
 				base += (FstClusHJQ - 2) * BytsPerSec;//Ğ´ÔÚ¶ÔÓ¦µÄÉÈÇø£¡
@@ -209,11 +208,11 @@ DWORD MyCreateFile(char *pszFolderPath, char *pszFileName)
 				//TODO:°Ñ¶ÔÓ¦ÉÈÇø´ÓF6Çå0£¡!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!------------------------------------------
 				clearCu(DirInfo_ptr->DIR_FstClus);
 				writeFat(FstClus, 0xffff);
-				return FileHandle;
+				return dwHandle;
 			}
 		}
 	}
-	return FileHandle;
+	return dwHandle;
 
 
 
@@ -271,9 +270,9 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 	fillHandles();
 	DWORD FileHandle = 0;
 	bool trick = true;//trick:ÎªÕæ²ÅÄÜ·µ»Ø¡£
-	int HandleBack=0;
+	int HandleBack = 0;
 	//printBPB();
-	cout << "[output]trying to delete file named " << pszFileName;
+	cout << "[output]trying to open file named " << pszFileName;
 	if (strcmp(pszFolderPath, "") != 0)
 	{
 		//trick:Èç¹ûÃ»ÓĞÄ¿Â¼£¬µÚÒ»´Î³öÏÖ¾ÍÈ¡³ö¡£Èç¹ûÃ»ÓĞÄ¿Â¼£¬ÄÇÃ´µÚ¶ş´ÎÈ¡³ö
@@ -282,11 +281,10 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 	}
 	else cout << endl;
 	//œÊ‚äŒ¤ÕÒ
-	int i = 0;
-	vector<RootEntry>::iterator it;// = dwHandles.begin();
-	for (it = dwHandles.begin(); it != dwHandles.end(); it++)
+	int size = dwHandles.size();
+	for (int i = 0; i < size; i++)
 	{
-		if (strcmp(pszFileName, dwHandles[i].DIR_Name) == 0)
+		if (strcmp(pszFileName, dwHandles[i].fileInfo.DIR_Name) == 0)
 		{
 			FileHandle = i;
 			if (trick) {
@@ -298,8 +296,6 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 				HandleBack = FileHandle;
 			}
 		}
-		i++;
-
 	}
 	/*for (int i = 1; i < dwHandles.size(); i++)
 	{
@@ -312,14 +308,13 @@ DWORD MyOpenFile(char *pszFolderPath, char *pszFileName)
 	}*/
 	return HandleBack;
 }
-
-BOOL MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈİ£¿?
+void MyCloseFile(DWORD dwHandle) {
+	dwHandles.clear();
+}
+BOOL MyDeleteFile(char *pszFolderPath, char *pszFileName)
 {
-	int FileHandle = 0;
-	u16 FstClus = findEmptyFat();//ÓÃÀ´ÌîĞ´DIR_FstClus
 	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
 	int base;
-	cout << "[debug]findEmptyFat():" << FstClus << endl;
 	cout << "[output]trying to delete file named " << pszFileName;
 	if (strcmp(pszFolderPath, "") != 0)
 	{
@@ -348,7 +343,7 @@ BOOL MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈ
 	else {
 		cout << endl;
 		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
-	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬´´½¨ÔÚ¸ùÄ¿Â¼ÏÂ¡£
+	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬ÎÄ¼şÔÚ¸ùÄ¿Â¼ÏÂ¡£
 
 	cout << "[output]" << pszFileName << "'s RootEntry is ready to be cleared in position:" << hex << base << " (16 hexadecimal)" << endl;
 	for (int i = 0; i < RootEntCnt; i++)//ÕÒµ½ÒªÉ¾³ıµÄÎÄ¼ş£¡
@@ -432,6 +427,99 @@ BOOL MyDeleteFile(char *pszFolderPath, char *pszFileName)//Ã»±ØÒªÉ¾³ıÊı¾İ´ØµÄÄÚÈ
 	return;
 	*/
 }
+BOOL MyDeleteDirectory(char *pszFolderPath, char *pszFolderName) {
+	u16 FstClusHJQ;//ÓÃÀ´´æ´¢¸ùÄ¿Â¼µÄDIR_FstClus
+	int base;
+	cout << "[output]trying to delete directory named " << pszFolderName;
+	if (strcmp(pszFolderPath, "") != 0)
+	{
+		cout << " in folder " << pszFolderPath << endl;
+		if ((FstClusHJQ = isPathExist(pszFolderPath)) || strlen(pszFolderPath) == 3)//´æÔÚ²ÅÄÜ¼ÌĞø,ÒÔºóÌí¼ÓµÄÎÄ¼şÓ¦
+		{
+			if (isDirectoryExist(pszFolderName, FstClusHJQ))
+			{
+				cout << "[output]" << pszFolderPath << '\\' << pszFolderName << "folder existed! Continuing..." << endl;
+			}
+			if (FstClusHJQ == 0) {
+				// ¸ùÄ¿Â¼ÇøÆ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+			}
+			else {
+				// Êı¾İÇøÎÄ¼şÊ×Ö·Æ«ÒÆ
+				base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//=
+				cout << "[debug]" << pszFolderPath << "'s FstClus value is:" << FstClusHJQ << ";postion (16Î»): is " << hex << base << endl;
+			}
+		}
+		else {
+			cout << "[output]" << pszFolderPath << '\\' << pszFolderName << " path does not exist!" << endl;
+			return false;
+		}
+	}//---------------------------------------------ÉÏÃæÊÇÊäÈëÁËÂ·¾¶µÄÇé¿ö¡£
+	else {
+		cout << endl;
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;
+	}//---------------------------------------------Ã»ÓĞÂ·¾¶£¬ÎÄ¼şÔÚ¸ùÄ¿Â¼ÏÂ¡£
+	cout << "[output]" << pszFolderName << "'s RootEntry is ready to be cleared in position:" << hex << base << " (16 hexadecimal)" << endl;
+	for (int i = 0; i < RootEntCnt; i++)//ÕÒµ½ÒªÉ¾³ıµÄÎÄ¼ş£¡
+	{
+		SetHeaderOffset(base, NULL, FILE_BEGIN);
+		ReadFromDisk(rootEntry_ptr, 32, NULL);
+		base += 32;
+		int base_back = base;
+		if (strcmp(pszFolderName, rootEntry_ptr->DIR_Name) == 0)//ÕÒµ½À²
+		{
+			RootEntry *DirInfo_ptr = (RootEntry*)malloc(sizeof(RootEntry));
+
+			FstClusHJQ = rootEntry_ptr->DIR_FstClus;//Ôİ´æ×Ô¼ºµÄÊ×´Ø
+//TODO:É¾³ıÄ¿Â¼ÏÂµÄÎÄ¼şÓëÄ¿Â¼¡£ÎÄ¼ş£ºÉ¾³ı¼ÇÂ¼¼´¿É£¡ĞèÒªÇå¿ÕÆä´Ø£¡ËùÒÔµ÷ÓÃº¯Êı¼´¿É
+			base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClusHJQ - 2) * BytsPerSec;//1 ÏÈÈ¥É¾³ıËû¿Õ¼äµÄÎÄ¼ş
+			for (int i = 0; i < RootEntCnt; i++)//ÕÒµ½ÒªÉ¾³ıµÄÎÄ¼ş£¡
+			{
+				SetHeaderOffset(base, NULL, FILE_BEGIN);
+				ReadFromDisk(rootEntry_ptr, 32, NULL);
+				base += 32;
+				if (rootEntry_ptr->DIR_Attr == 0x20 && rootEntry_ptr->DIR_Name[0] != '.')//2ÕÒµ½ÁËÎÄ¼ş
+				{
+
+
+					char tmpPath1[sizeof(pszFolderName) + 3] = { 0 };
+					strcat(tmpPath1, "c:\\");
+					strcat(tmpPath1, pszFolderName);
+					char tmpName[sizeof(rootEntry_ptr->DIR_Name)];
+					strcpy(tmpName, rootEntry_ptr->DIR_Name);
+					MyDeleteFile(tmpPath1, tmpName);
+					continue;
+				}
+				if (rootEntry_ptr->DIR_Attr == 0x10 && rootEntry_ptr->DIR_Name[0] != '.')//3ÕÒµ½ÁËÄ¿Â¼
+				{
+					char tmpPath1[sizeof(pszFolderName) + 3] = { 0 };
+					strcat(tmpPath1, "c:\\");
+					strcat(tmpPath1, pszFolderName);
+					MyDeleteDirectory(tmpPath1, rootEntry_ptr->DIR_Name);
+					continue;
+				}
+			}
+			SetHeaderOffset(base_back - 32, NULL, FILE_BEGIN);//Ğ´ÔÚ¸ùÄ¿Â¼//×¢Òâ£ºÕâÀïºóÃæÒªÓÃ£¡ËùÒÔÏÈ²»×Å¼±Çå³ı£¡
+			initFileInfo(DirInfo_ptr, "", 0x0, 0, 0);
+			WriteToDisk(DirInfo_ptr, 32, NULL);
+			clearCu(FstClusHJQ);
+			writeFat(FstClusHJQ, 0x0000);
+			//int nextClus = 0;
+			//do {
+			//	if (nextClus != 0)//ÉñÀ´Ö®±Ê£¡ÓÃÀ´°¤¸öÉ¾³ı¶«Î÷£¡
+			//	{
+			//		FstClusHJQ = nextClus;
+			//	}
+			//	clearCu(FstClusHJQ);
+			//	nextClus = findNextFat(FstClusHJQ);
+			//	writeFat(FstClusHJQ, 0x0000);
+			//} while (nextClus != 0xFFF && nextClus != 0);
+			return true;
+		}
+	}
+	return false;
+}
+
 //TODO: Ğ´ÎÄ¼ş
 /** \brief
 *
@@ -444,28 +532,198 @@ dwBytesToWrite£º´ıĞ´ÈëÊı¾İµÄ³¤¶È
 *
 */
 DWORD MyWriteFile(DWORD dwHandle, LPVOID pBuffer, DWORD dwBytesToWrite) {
-	int FstClus = dwHandles[dwHandle].DIR_FstClus;
-	int dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
-	cout << "[debug] " << dwHandles[dwHandle].DIR_Name << " locates at " << dataBase << " (10 hexadecimal) 0x" << DecIntToHexStr(dataBase) << "H (16 hexadecimal) in file!" << endl;
-	//»ñÈ¡ÁË£¡ÒªĞ´µÄµØÖ·
-	//¸ùÄ¿Â¼ÇøµÄÆğÊ¼µØÖ·Îª£¨1+9+9£©*512=0x2600h£¬
-	//¼Ù¶¨¸ùÄ¿Â¼Çø´óĞ¡Îª0x1c00£¨ÈíÅÌÈ±Ê¡Öµ224*32Bytes£©£¬ÔòÊı¾İÇøÆğÊ¼Æ«ÒÆÎª0x2600+0x1c00=0x4200¡£
-	SetHeaderOffset(dataBase, NULL, FILE_BEGIN);
-	if (WriteToDisk(pBuffer, dwBytesToWrite, NULL))
+	int lenOfBuffer = dwBytesToWrite; // »º³åÇø´ıĞ´Èë³¤¶È
+	char* cBuffer = (char*)malloc(sizeof(u8)*lenOfBuffer);
+	memcpy(cBuffer, pBuffer, lenOfBuffer); // ¸´ÖÆ¹ıÀ´
+	struct RootEntry* FileInfo_ptr = &dwHandles[dwHandle].fileInfo;
+	u32 updatedFileSize = dwBytesToWrite;
+	int dataBase = 0, dataOffset = 0;
+	//TODO:¸ù¾İheaderÈ¥¶Á
+	u16 FstClus = FileInfo_ptr->DIR_FstClus;
+	u16 nextEmptyClus = findEmptyFat();
+	LONG offset = dwHandles[dwHandle].offset;//»ñÈ¡¼ÇÂ¼µÄµ±Ç°Æ«ÒÆ
+	int curClusNum = offset / (BytsPerSec*SecPerClus); // µ±Ç°Ö¸ÕëÔÚµÚ¼¸¸öÉÈÇø,Èç¹ûÎª0ÔòÔÚÊ×´Ø£¬Îª1ÔòËµÃ÷ÔÚÁ´½ÓµÄµÚÒ»¸ö´Ø
+	int curClusOffset = (offset )% (BytsPerSec*SecPerClus); // µ±Ç°ÔÚÉÈÇøÄÚÆ«ÒÆ
+	u16 needClu = (curClusOffset + dwBytesToWrite + (BytsPerSec*SecPerClus) - 1) / (BytsPerSec*SecPerClus);//ĞèÒªµÄ´ØÊıÁ¿¡£ÊÇÒ»¸öÕûÊı£¬±ÈÈç1,2,3£¬
+	//--------------------------------ÏÂÃæÊÇ¸üĞÂFAT¡£
+	if (needClu == 1)//½ö½öĞèÒªÒ»¸ö´Ø£¬Ìî½øÈ¥¾ÍÊÇÁË
 	{
-		dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//Ğ´»Øfat
-		dwHandles[dwHandle].DIR_FileSize = dwBytesToWrite;
-		struct RootEntry* FileInfo_ptr = &dwHandles[dwHandle];
-		updateRootEntry(FileInfo_ptr);
-
-
-		return dwBytesToWrite;
 	}
+	else if (needClu > 1)
+	{
+		u16 nextClus;
+		u16 FstClusUse = FstClus;//±£Ö¤FstClus²»±ä¡£
+		u16 needClusBack = needClu;//±£Ö¤FstClus²»±ä¡£
+		int originClus = 1;//ÎÄ¼şÓµÓĞµÄ´ØµÄ¸öÊı
+		//int curClusNum_PLUS_needClu = curClusNum + needClu;
+		while (1)//Õâ¸öÑ­»·ÓÃÀ´Í³¼ÆÔ­À´µÄÎÄ¼ş·ÖÅäÁË¶àÉÙ¸ö´Ø
+		{
+			if (findNextFat(FstClusUse) == 0xfff)
+			{
+				//Èç¹ûÊÇĞÂÎÄ¼ş£¬Ö»ÓĞÒ»¸ö´Ø£¬ÄÇÃ´originClus=1
+				break;
+			}
+			else {
+				FstClusUse = findNextFat(FstClusUse);
+				originClus++;
+			}
+		}
+#define Empty_File 1
+		//ÒÑ¾­È·¶¨ÁËËûÊÇ¸öĞÂÎÄ¼ş¡¢Ğ¡ÎÄ¼ş¡¢´óÎÄ¼ş¡£
+		if (originClus >= needClusBack+curClusNum)//´óÎÄ¼ş£¬ÓÃËûÒÔÇ°µÄÉÈÇø¾ÍĞĞÁË¡£µÈÊ½ÓÒ±ß×î´óÖµÊÇMY_FILE_ENDµÄÇé¿ö¡£
+		{
+
+		}
+		else if (originClus == Empty_File)//¿ÕÎÄ¼ş£¬Ôò·ÖÅäĞÂµÄ×ã¹»ÊıÁ¿µÄÉÈÇø
+		{
+			needClu = needClusBack;
+			while (needClu > 1)//£¨±Ø¶¨»á½øÈë£©£¬Õâ¸öÑ­»·ÓÃÀ´·ÖÅäĞÂfat
+			{
+				nextClus = findEmptyFat();
+				writeFat(FstClusUse, nextClus);//½«×Ô¼º´Ó0XFFF¸üĞÂ³ÉÏÂÒ»´Ø¡£
+				needClu--;
+				FstClusUse = nextClus;
+				continue;
+			}
+			writeFat(FstClusUse, 0xffff);//½«Ä©Î²´ØĞ´³É0xfff
+		}
+		else if (originClus > Empty_File && originClus < needClusBack+curClusNum)//Ò»°ã´óĞ¡ÎÄ¼ş£¬ĞèÒªÀ©Õ¹Ëû·ÖÅäµÄ´Ø¡£±ÈÈçÒÔÇ°ÓĞ2´Ø£¬ĞèÒª3´Ø£¬ÄÇÃ´»¹ĞèÒª·ÖÅäÒ»´Ø¡£
+		{
+
+			needClu = needClusBack;
+			FstClusUse = FstClus;
+			while (findNextFat(FstClusUse) != 0xFFF && findNextFat(FstClusUse) != 0)//Ñ°ÕÒÎÄ¼şÒÑ¾­·ÖÅäµÄ×îºóÒ»¸ö´Ø¡£
+			{
+				FstClusUse = findNextFat(FstClusUse);
+			}
+			while (needClu > 1)//£¨±Ø¶¨»á½øÈë£©£¬Õâ¸öÑ­»·ÓÃÀ´·ÖÅäĞÂfat
+			{
+				nextClus = findEmptyFat();
+				writeFat(FstClusUse, nextClus);//½«×Ô¼º´Ó0XFFF¸üĞÂ³ÉÏÂÒ»´Ø¡£
+				needClu--;
+				FstClusUse = nextClus;
+				continue;
+			}
+			writeFat(FstClusUse, 0xffff);//½«Ä©Î²´ØĞ´³É0xfff
+		}
+
+
+
+
+	}
+
+	else {
+		cout << "[debug]ĞèÒªµÄ´Ø¼ÆËã³ö´í£¬Çëµ÷ÊÔ¡£needClu:" << needClu << endl;
+		return -1;
+	}
+	dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (curClusNum + FstClus - 2) * BytsPerSec;//Éè¶¨Ê×´ØÆ«ÒÆÖµ
+	dataOffset = dataBase + curClusOffset;//±£´æÔÚdataOffsetÖĞ
+	//------------------ÏÂÃæÊÇ¸üĞÂRootENTRY
+	fillTime(FileInfo_ptr->DIR_WrtDate, FileInfo_ptr->DIR_WrtTime);
+	if (FileInfo_ptr->DIR_FileSize >= (lenOfBuffer + offset))//Èç¹ûĞ´ÈëµÄ³¤¶È+Æ«ÒÆ<=Ô­ÎÄ¼ş´óĞ¡,ÄÇÃ´ÎÄ¼ş´óĞ¡²»±ä¡£
+	{
+	}
+	else {
+		FileInfo_ptr->DIR_FileSize = offset + lenOfBuffer;
+	}
+	updateRootEntry(dwHandles[dwHandle].parentClus, FileInfo_ptr);
+	//------------------ÏÂÃæÊÇĞ´Èë¡£
+	int hasWritten = 0;
+	if (lenOfBuffer < 512 - curClusOffset)//ºÜĞ¡£¬¾ÍĞ´Ò»¸ö´Ø¡£´ØÖĞÊ£ÏÂµÄ×ã¹»ÌîÈë¡£
+	{
+		SetHeaderOffset(dataOffset, NULL, FILE_BEGIN);
+		WriteToDisk(cBuffer, lenOfBuffer, NULL);
+		return lenOfBuffer;
+	}
+	do {//ÒªĞ´¶à¸ö´Ø
+		dataOffset = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (curClusNum + FstClus - 2) * BytsPerSec + curClusOffset;//dataOffset¸üĞÂ¡£
+		//µÚÒ»´ÎĞ´ÒÔºócurClusOffset±Ø¶¨»á±ä0¡£
+		SetHeaderOffset(dataOffset, NULL, FILE_BEGIN);
+
+		if (hasWritten + 512-curClusOffset <= lenOfBuffer)//µÚÒ»´ÎĞ´Èë£¬¸ù¾İµ±Ç°µÄÆ«ÒÆĞ´¡£Èç¹ûÊ£ÏÂµÄ¿Õ¼äÒÑ¾­×ã¹»Ğ´Èë£¬ÄÇÃ´Ã´Ğ´Èë¼´¿É
+		{
+			WriteToDisk(&cBuffer[hasWritten], 512 - curClusOffset, NULL);
+		}
+		else {
+			WriteToDisk(&cBuffer[hasWritten], lenOfBuffer - hasWritten, NULL);//Ğ´ÈëÊ£ÏÂµÄ×Ö·û¡£
+		}
+		hasWritten += 512 - curClusOffset;
+		curClusOffset = 0;//Ğ´ÁËµÚÒ»´ÎÒÔºó£¬Ëü¾Í±ä³É0£¬ÒÔºóÃ¿´Î¶¼Ğ´512×Ö½Ú¡£
+	} while ((FstClus = findNextFat(FstClus)) != 0xfff && FstClus != 0);
+		return lenOfBuffer;
+
+
+	//int FstClus = dwHandles[dwHandle].fileInfo.DIR_FstClus;
+	//int dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
+	//cout << "[debug] " << dwHandles[dwHandle].fileInfo.DIR_Name << " locates at " << dataBase << " (10 hexadecimal) 0x" << DecIntToHexStr(dataBase) << "H (16 hexadecimal) in file!" << endl;
+	////»ñÈ¡ÁË£¡ÒªĞ´µÄµØÖ·
+	////¸ùÄ¿Â¼ÇøµÄÆğÊ¼µØÖ·Îª£¨1+9+9£©*512=0x2600h£¬
+	////¼Ù¶¨¸ùÄ¿Â¼Çø´óĞ¡Îª0x1c00£¨ÈíÅÌÈ±Ê¡Öµ224*32Bytes£©£¬ÔòÊı¾İÇøÆğÊ¼Æ«ÒÆÎª0x2600+0x1c00=0x4200¡£
+	//SetHeaderOffset(dataBase, NULL, FILE_BEGIN);
+	//if (WriteToDisk(pBuffer, dwBytesToWrite, NULL))
+	//{
+	//	dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec;//Ğ´»Øfat
+	//	dwHandles[dwHandle].fileInfo.DIR_FileSize = dwBytesToWrite;
+	//	struct RootEntry* FileInfo_ptr = &dwHandles[dwHandle].fileInfo;
+	//	updateRootEntry(FileInfo_ptr);
+	//	return dwBytesToWrite;
+	//}
 	return -1;
 }
 DWORD MyReadFile(DWORD dwHandle, LPVOID pBuffer, DWORD dwBytesToRead)
 {
-	int FstClus = dwHandles[dwHandle].DIR_FstClus;
+	struct RootEntry* FileInfo_ptr = &dwHandles[dwHandle].fileInfo;
+	//TODO:¸ù¾İheaderÈ¥¶Á
+	u16 FstClus = FileInfo_ptr->DIR_FstClus;
+	LONG offset = dwHandles[dwHandle].offset;//»ñÈ¡¼ÇÂ¼µÄµ±Ç°Æ«ÒÆ
+	int curClusNum = offset / BytsPerSec; // µ±Ç°Ö¸ÕëÔÚµÚ¼¸¸öÉÈÇø
+	int curClusOffset = offset % BytsPerSec; // µ±Ç°ÔÚÉÈÇøÄÚÆ«ÒÆ
+	while (curClusNum) {
+		if (findNextFat(FstClus) == 0xFFF) {
+			break;
+		}
+		FstClus = findNextFat(FstClus);
+		curClusNum--;
+	}// »ñÈ¡µ±Ç°Ö¸ÕëËùÖ¸ÉÈÇø
+
+
+	//memset(cBuffer, 0, lenOfBuffer);
+	int hasRead = 0;
+	int base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
+	int dataOffset = base + curClusOffset;
+	int lenOfBuffer = dwBytesToRead;// »º³åÇø´ı¶ÁÈë³¤¶È
+	if (FileInfo_ptr->DIR_FileSize - offset < lenOfBuffer) {
+		lenOfBuffer = FileInfo_ptr->DIR_FileSize - offset;
+	}
+	char* cBuffer = (char*)malloc(sizeof(u8)*lenOfBuffer);// ´´½¨Ò»¸ö»º³åÇø
+	memset(cBuffer, 0, lenOfBuffer);
+	cout << "[output]" << dwHandles[dwHandle].fileInfo.DIR_Name << "'s FstClus value is:" << FstClus << ";postion (16Î»): is " << hex << base << endl;
+	int count = BytsPerSec*SecPerClus / 512;//Ã¿Ò»¸ö´ØĞèÒª¶ÁÈ¡µÄ´ÎÊı
+	char byte[512];
+	do {
+		base = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
+		for (int i = 0; i < count; i++)
+		{
+			SetHeaderOffset(base, NULL, FILE_BEGIN);
+			ReadFromDisk(byte, 512, NULL);
+		}
+		//cout << byte ;
+		FstClus = findNextFat(FstClus);
+		if (hasRead > lenOfBuffer)//Èç¹û¼ÓÉÏÏÂÒ»¸ö512×Ö½ÚÒÑ¾­±ÈÎÒÃÇÒªÇóµÄ×Ö½Ú¶àÁË
+		{
+			memcpy(&cBuffer[hasRead], byte, lenOfBuffer - hasRead + 512);
+			break;
+		}
+		memcpy(&cBuffer[hasRead], byte, 512);
+		hasRead += 512;
+	} while (FstClus != 0xfff && FstClus != 0);
+	//cout << endl;
+	cout << "[output]File contend:" << endl << cBuffer << endl;
+	memcpy(pBuffer, cBuffer, 512);
+
+
+
+	/*int FstClus = dwHandles[dwHandle].DIR_FstClus;
 	int dataBase = (RsvdSecCnt + NumFATs * FATSz) * BytsPerSec + RootEntCnt * 32 + (FstClus - 2)*BytsPerSec;
 	cout << "[debug] " << dwHandles[dwHandle].DIR_Name << " locates at " << dataBase << " (10 hexadecimal) 0x" << DecIntToHexStr(dataBase) << "H (16 hexadecimal) in file!" << endl;
 	//»ñÈ¡ÁË£¡ÒªĞ´µÄµØÖ·
@@ -482,5 +740,49 @@ DWORD MyReadFile(DWORD dwHandle, LPVOID pBuffer, DWORD dwBytesToRead)
 		///printf("[output]Read file:%s\ncontents: %s \n", dwHandles[dwHandle].DIR_Name, get_raw_string(pBuffer));
 		return dwBytesToRead;
 	}
+	*/
 	return -1;
+}
+BOOL MySetFilePointer(DWORD dwFileHandle, int nOffset, DWORD dwMoveMethod) {
+	FileHandle *hd = &dwHandles[dwFileHandle];
+	//if (hd == NULL ) return FALSE; // ¾ä±ú²»´æÔÚ
+	LONG curOffset = nOffset + hd->offset; // currentÄ£Ê½ÏÂÆ«ÒÆºóµÄÎ»ÖÃ
+	u16 currentClus = hd->fileInfo.DIR_FstClus; // Ê×´Ø
+	int fileSize = hd->fileInfo.DIR_FileSize; // ÎÄ¼ş´óĞ¡
+	switch (dwMoveMethod) {
+	case MY_FILE_BEGIN:
+		if (nOffset < 0) {
+			hd->offset = 0; // Ğ¡ÓÚ0£¬ÖÃÎª0
+		}
+		else if (nOffset > fileSize) {
+			hd->offset = fileSize;
+		}
+		else {
+			hd->offset = nOffset;
+		}
+		break;
+	case MY_FILE_CURRENT:
+		if (curOffset < 0) {
+			hd->offset = 0;
+		}
+		else if (curOffset > fileSize) {
+			hd->offset = fileSize;
+		}
+		else {
+			hd->offset = curOffset;
+		}
+		break;
+	case MY_FILE_END:
+		if (nOffset > 0) {
+			hd->offset = fileSize;
+		}
+		else if (nOffset < -fileSize) {
+			hd->offset = 0;
+		}
+		else {
+			hd->offset = fileSize + nOffset;
+		}
+		break;
+	}
+	return TRUE;
 }
